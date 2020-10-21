@@ -20,7 +20,7 @@ namespace DemoAppModel.Architecture
         private const string ExternalSystemTag = "Extern Systeem";
         private const string WebBrowserTag = "Web Browser";
         private const string DatabaseTag = "Database";
-
+        private const string FailoverTag = "Failover";
 
         private readonly IStructurizrService structurizrService;
         private readonly ILogger<SoftwareArchitecture> logger;
@@ -82,9 +82,10 @@ namespace DemoAppModel.Architecture
             helpdesk.Uses(itsmSysteem, Gebruikt);
             hoofdgebruiker.InteractsWith(helpdesk, "Vraagt hulp van");
 
+            // Extra diagram: Systeemlandschap
             SystemLandscapeView systemLandscapeView = views.CreateSystemLandscapeView("SystemLandscape", "System Context diagram Boekhoudsysteem.");
             systemLandscapeView.AddAllElements();
-            systemLandscapeView.EnableAutomaticLayout();
+            //systemLandscapeView.EnableAutomaticLayout();
 
 
             // containers
@@ -160,11 +161,11 @@ namespace DemoAppModel.Architecture
             Component bankInstellingData = bankModule.AddComponent("Bankinstellingen data service", "Datalaag bankinstellingen", "C#");
             bankInstellingData.AddTags(InternalSystemTag);
 
-            bankInstellingView.Uses(bankInstellingLogic, "Leest en schrijft naar");
-            bankInstellingLogic.Uses(bankInstellingData, "Leest en schrijft naar");
+            bankInstellingView.Uses(bankInstellingLogic, Gebruikt);
+            bankInstellingLogic.Uses(bankInstellingData, Gebruikt);
 
-            bankPaymentData.Uses(databaseAccount, Gebruikt, "Linq2Sql");
-            bankInstellingData.Uses(databaseAccount, Gebruikt, "Linq2Sql");
+            bankPaymentData.Uses(databaseAccount, "Leest en schrijft naar", "Linq2Sql");
+            bankInstellingData.Uses(databaseAccount, "Leest en schrijft naar", "Linq2Sql");
 
             Component importExportView = importModule.AddComponent("Artikel Import", "Importscherm artikelen", "ASP.Net Webform");
             importExportView.AddTags(WebBrowserTag);
@@ -175,15 +176,15 @@ namespace DemoAppModel.Architecture
 
             importExportView.Uses(importExportLogic, Gebruikt);
             importExportLogic.Uses(importExportData, Gebruikt);
-            importExportData.Uses(databaseAccount, Gebruikt, "Linq2Sql");
+            importExportData.Uses(databaseAccount, "Leest en schrijft naar", "Linq2Sql");
 
             // Add Views
             SystemContextView contextView = views.CreateSystemContextView(boekhoudSysteem, "SystemContext", "System Context diagram Boekhoudsysteem.");
             contextView.AddNearestNeighbours(boekhoudSysteem);
-            contextView.EnableAutomaticLayout();
+            //contextView.EnableAutomaticLayout();
 
             ContainerView containerView = views.CreateContainerView(boekhoudSysteem, "Containers", "Het container diagram voor het boekhoudsysteem.");
-            containerView.EnableAutomaticLayout();
+            //containerView.EnableAutomaticLayout();
             containerView.Add(hoofdgebruiker);
             containerView.Add(gebruiker);
             containerView.Add(accountant);
@@ -194,15 +195,59 @@ namespace DemoAppModel.Architecture
             containerView.Add(itsmSysteem);
 
             ComponentView bankComponentView = views.CreateComponentView(bankModule, "Bank Components", "Component diagram van de Bank module");
-            bankComponentView.EnableAutomaticLayout();
+            //bankComponentView.EnableAutomaticLayout();
             bankComponentView.Add(databaseAccount);
             bankComponentView.AddAllComponents();
             bankComponentView.Add(bank);
 
             ComponentView importExportComponentView = views.CreateComponentView(importModule, "Import-Export Components", "Component diagram van de Import Export module.");
-            importExportComponentView.EnableAutomaticLayout();
+            //importExportComponentView.EnableAutomaticLayout();
             importExportComponentView.Add(databaseAccount);
             importExportComponentView.AddAllComponents();
+
+
+            // Extra diagram: Deployment
+            const string Productie = "Productieomgeving";
+
+            DeploymentNode productieOmgeving = model.AddDeploymentNode(Productie, $"{BedrijfsNaam}", "", $"{BedrijfsNaam} data center");
+            DeploymentNode customerComputer = model.AddDeploymentNode(Productie, "Gebruiker's computer", "", "Microsoft Windows or Apple macOS");
+            customerComputer.AddDeploymentNode("Web Browser", "", "Chrome, Firefox, Edge or IE11").Add(boekhoudModule);
+            customerComputer.AddTags(WebBrowserTag);
+
+            DeploymentNode productieWebServer = productieOmgeving.AddDeploymentNode($"{BedrijfsNaam}-web***", "Een webserver gehost in een webserver farm", "Windows 2019", 2, DictionaryUtils.Create("Location=Amsterdam"));
+            productieWebServer
+                .AddDeploymentNode("Microsoft IIS", "Microsoft web server.", "IIS", 1, DictionaryUtils.Create("Xmx=512M", "Xms=1024M", ".Net Framework 4.8"))
+                .Add(boekhoudModule);
+            customerComputer.Uses(productieWebServer, Gebruikt, "https");
+
+            DeploymentNode primaryDatabaseServer = productieOmgeving
+                .AddDeploymentNode($"{BedrijfsNaam}-db01", "Primary database server.", "Windows 2019", 1, DictionaryUtils.Create("Location=Amsterdam"))
+                .AddDeploymentNode("SQL Server - Primary", $"Primary, {Productie} databaseserver.", "SqlServer 2017");
+            primaryDatabaseServer.Add(databaseSystem);
+            primaryDatabaseServer.Add(databaseAccount);
+
+            DeploymentNode failoverDb = productieOmgeving.AddDeploymentNode($"{BedrijfsNaam}-db02", "Secondary database server.", "Windows 2019", 1, DictionaryUtils.Create("Location=Amsterdam"));
+            failoverDb.AddTags(FailoverTag);
+
+            DeploymentNode secondaryDatabaseServer = failoverDb.AddDeploymentNode("SQL Server - Secondary", "Secondary, standby database server, alleen voor failover.", "SqlServer 2017");
+            secondaryDatabaseServer.AddTags(FailoverTag);
+
+            ContainerInstance secondaryDatabaseSystem = secondaryDatabaseServer.Add(databaseSystem);
+            ContainerInstance secondaryDatabaseAccount = secondaryDatabaseServer.Add(databaseAccount);
+
+            model.Relationships.Where(r => r.Destination.Equals(secondaryDatabaseSystem)).ToList().ForEach(r => r.AddTags(FailoverTag));
+            model.Relationships.Where(r => r.Destination.Equals(secondaryDatabaseAccount)).ToList().ForEach(r => r.AddTags(FailoverTag));
+            Relationship dataReplicationRelationship = primaryDatabaseServer.Uses(secondaryDatabaseServer, "Replicates data to", "");
+            secondaryDatabaseSystem.AddTags(FailoverTag);
+            secondaryDatabaseAccount.AddTags(FailoverTag);
+
+            DeploymentView systeemDeploymentView = views.CreateDeploymentView(boekhoudSysteem, Productie, $"De productieomgeving van {BedrijfsNaam}.");
+            //systeemDeploymentView.EnableAutomaticLayout();
+            systeemDeploymentView.Environment = Productie;
+            systeemDeploymentView.Add(productieOmgeving);
+            systeemDeploymentView.Add(customerComputer);
+            systeemDeploymentView.Add(dataReplicationRelationship);
+
 
             // Set Styling
             Styles styles = views.Configuration.Styles;
@@ -214,6 +259,8 @@ namespace DemoAppModel.Architecture
             styles.Add(new ElementStyle(ExternalSystemTag) { Background = "#999999", Color = "#ffffff" });
             styles.Add(new ElementStyle(WebBrowserTag) { Shape = Shape.WebBrowser });
             styles.Add(new ElementStyle(DatabaseTag) { Shape = Shape.Cylinder });
+            styles.Add(new ElementStyle(FailoverTag) { Opacity = 25 });
+            styles.Add(new RelationshipStyle(FailoverTag) { Opacity = 25, Position = 70 });
         }
 
         public void PublishC4Model()
