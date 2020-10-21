@@ -19,6 +19,8 @@ namespace DemoAppModel.Architecture
         private const string InternalSystemTag = "Intern Systeem";
         private const string ExternalSystemTag = "Extern Systeem";
         private const string WebBrowserTag = "Web Browser";
+        private const string DatabaseTag = "Database";
+
 
         private readonly IStructurizrService structurizrService;
         private readonly ILogger<SoftwareArchitecture> logger;
@@ -85,28 +87,121 @@ namespace DemoAppModel.Architecture
             systemLandscapeView.EnableAutomaticLayout();
 
 
+            // containers
+            Container coreModule = boekhoudSysteem.AddContainer("Core Module", "Basis module voor inrichting, gebruikers", "C#");
+            coreModule.AddTags(Tags.Container);
+            coreModule.Uses(itsmSysteem, "krijgt gegevens van");
+
+            Container bankModule = boekhoudSysteem.AddContainer("Bank Module", "Importeren van betaalgegevens", "C#");
+            bankModule.AddTags(Tags.Container);
+            bankModule.Uses(bank, "krijgt gegevens van");
+            
+            Container koppelingModule = boekhoudSysteem.AddContainer("Koppelingen Module", "Module voor inrichten diverse externe koppelingen", "C#");
+            koppelingModule.AddTags(Tags.Container);
+            koppelingModule.Uses(webshop, "krijgt gegevens van");
+
+            Container boekhoudModule = boekhoudSysteem.AddContainer("Boekhoud Module", "Basis onderdelen van een Boekhoudsysteem zoals dagboeken en rapportages", "C#");
+            boekhoudModule.AddTags(Tags.Container);
+            boekhoudModule.Uses(webshop, "krijgt gegevens van");
+
+            Container facturatieModule = boekhoudSysteem.AddContainer("Facturatie Module", "Facturatie en Offerte module", "C#");
+            facturatieModule.AddTags(Tags.Container);
+            facturatieModule.Uses(boekhoudModule, "geeft verkooporders aan");
+
+            Container importModule = boekhoudSysteem.AddContainer("Import Module", "Module voor import en export gegevens", "C#");
+            importModule.AddTags(Tags.Container);
+            importModule.Uses(boekhoudModule, "geeft relaties aan");
+            importModule.Uses(facturatieModule, "geeft artikelen aan");
+
+            hoofdgebruiker.Uses(coreModule, Gebruikt);
+            hoofdgebruiker.Uses(boekhoudModule, Gebruikt);
+            hoofdgebruiker.Uses(facturatieModule, Gebruikt);
+            hoofdgebruiker.Uses(bankModule, Gebruikt);
+            hoofdgebruiker.Uses(koppelingModule, Gebruikt);
+            hoofdgebruiker.Uses(importModule, Gebruikt);
+
+            gebruiker.Uses(boekhoudModule, Gebruikt);
+            gebruiker.Uses(facturatieModule, Gebruikt);
+            gebruiker.Uses(bankModule, Gebruikt);
+
+            accountant.Uses(boekhoudModule, Gebruikt);
+            helpdesk.Uses(boekhoudModule, Gebruikt);
+
+            Container databaseSystem = boekhoudSysteem.AddContainer("Systeem Database", "Opslag gebruikers, abonnement, administratie gegevens, hashed authentication credentials, access logs, etc.", "Relational Database Schema");
+            databaseSystem.AddTags(DatabaseTag);
+            coreModule.Uses(databaseSystem, Gebruikt);
+
+            Container databaseAccount = boekhoudSysteem.AddContainer("Boekhouding Database", "Opslag boekhouding per abonnement per administratie", "Relational Database Schema");
+            databaseAccount.AddTags(DatabaseTag);
+            boekhoudModule.Uses(databaseAccount, Gebruikt);
+            facturatieModule.Uses(databaseAccount, Gebruikt);
+            bankModule.Uses(databaseAccount, Gebruikt);
+
+            // Components
+            Component bankImportView = bankModule.AddComponent("Bank statement Import", "Importscherm bankafschriften", "ASP.Net Webform");
+            bankImportView.AddTags(WebBrowserTag);
+            Component bankPaymentLogic = bankModule.AddComponent("Payment logic service", "Businesslaag bankafschriften", "C#");
+            bankPaymentLogic.AddTags(InternalSystemTag);
+            Component bankPaymentData = bankModule.AddComponent("Payment data service", "Datalaag bankafschriften", "C#");
+            bankPaymentData.AddTags(InternalSystemTag);
+
+            bankImportView.Uses(bankPaymentLogic, Gebruikt);
+            bankPaymentLogic.Uses(bankPaymentData, Gebruikt);
+            bankPaymentLogic.Uses(bank, Gebruikt);
+
+            Component bankPaymentView = bankModule.AddComponent("Bank payments", "Betaalopdrachten", "ASP.Net Webform");
+            bankPaymentView.AddTags(WebBrowserTag);
+            bankPaymentView.Uses(bankPaymentLogic, Gebruikt);
+
+            Component bankInstellingView = bankModule.AddComponent("Instellingen Bankstatements", "Instellingen bankafschriften", "ASP.Net Webform");
+            bankInstellingView.AddTags(WebBrowserTag);
+            Component bankInstellingLogic = bankModule.AddComponent("Bankinstellingen logic service", "Businesslaag bankinstellingen", "C#");
+            bankInstellingLogic.AddTags(InternalSystemTag);
+            Component bankInstellingData = bankModule.AddComponent("Bankinstellingen data service", "Datalaag bankinstellingen", "C#");
+            bankInstellingData.AddTags(InternalSystemTag);
+
+            bankInstellingView.Uses(bankInstellingLogic, "Leest en schrijft naar");
+            bankInstellingLogic.Uses(bankInstellingData, "Leest en schrijft naar");
+
+            bankPaymentData.Uses(databaseAccount, Gebruikt, "Linq2Sql");
+            bankInstellingData.Uses(databaseAccount, Gebruikt, "Linq2Sql");
+
+            model.AddImplicitRelationships();
+
             // Add Views
             SystemContextView contextView = views.CreateSystemContextView(boekhoudSysteem, "SystemContext", "System Context diagram Boekhoudsysteem.");
             contextView.AddNearestNeighbours(boekhoudSysteem);
             contextView.EnableAutomaticLayout();
-            
+
+            ContainerView containerView = views.CreateContainerView(boekhoudSysteem, "Containers", "Het container diagram voor het boekhoudsysteem.");
+            containerView.EnableAutomaticLayout();
+            containerView.Add(hoofdgebruiker);
+            containerView.Add(gebruiker);
+            containerView.Add(accountant);
+            containerView.Add(helpdesk);
+            containerView.AddAllContainers();
+            containerView.Add(webshop);
+            containerView.Add(bank);
+            containerView.Add(itsmSysteem);
 
 
-
-
-
-
-
-
+            ComponentView bankComponentView = views.CreateComponentView(bankModule, "Components", "The component diagram for the API Application.");
+            bankComponentView.EnableAutomaticLayout();
+            bankComponentView.Add(databaseAccount);
+            bankComponentView.AddAllComponents();
+            bankComponentView.Add(bank);
 
 
             // Set Styling
             Styles styles = views.Configuration.Styles;
             styles.Add(new ElementStyle(Tags.SoftwareSystem) { Background = "#1168bd", Color = "#ffffff" });
+            styles.Add(new ElementStyle(Tags.Container) { Background = "#438dd5", Color = "#ffffff" });
+            styles.Add(new ElementStyle(Tags.Component) { Background = "#85bbf0", Color = "#000000" });
+            styles.Add(new ElementStyle(Tags.Person) { Background = "#08427b", Color = "#ffffff", Shape = Shape.Person });
             styles.Add(new ElementStyle(InternalSystemTag) { Background = "#999999", Color = "#ffffff" });
             styles.Add(new ElementStyle(ExternalSystemTag) { Background = "#999999", Color = "#ffffff" });
-            styles.Add(new ElementStyle(Tags.Person) { Background = "#08427b", Color = "#ffffff", Shape = Shape.Person });
             styles.Add(new ElementStyle(WebBrowserTag) { Shape = Shape.WebBrowser });
+            styles.Add(new ElementStyle(DatabaseTag) { Shape = Shape.Cylinder });
         }
 
         public void PublishC4Model()
