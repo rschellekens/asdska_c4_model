@@ -166,7 +166,16 @@ namespace DemoAppModel.Architecture
             bankPaymentData.Uses(databaseAccount, Gebruikt, "Linq2Sql");
             bankInstellingData.Uses(databaseAccount, Gebruikt, "Linq2Sql");
 
-            model.AddImplicitRelationships();
+            Component importExportView = importModule.AddComponent("Artikel Import", "Importscherm artikelen", "ASP.Net Webform");
+            importExportView.AddTags(WebBrowserTag);
+            Component importExportLogic = importModule.AddComponent("Import Export logic service", "Businesslaag import export functionaliteit", "C#");
+            importExportLogic.AddTags(InternalSystemTag);
+            Component importExportData = importModule.AddComponent("Import Export data service", "Datalaag import export functionaliteit", "C#");
+            importExportData.AddTags(InternalSystemTag);
+
+            importExportView.Uses(importExportLogic, Gebruikt);
+            importExportLogic.Uses(importExportData, Gebruikt);
+            importExportData.Uses(databaseAccount, Gebruikt, "Linq2Sql");
 
             // Add Views
             SystemContextView contextView = views.CreateSystemContextView(boekhoudSysteem, "SystemContext", "System Context diagram Boekhoudsysteem.");
@@ -184,13 +193,16 @@ namespace DemoAppModel.Architecture
             containerView.Add(bank);
             containerView.Add(itsmSysteem);
 
-
-            ComponentView bankComponentView = views.CreateComponentView(bankModule, "Components", "The component diagram for the API Application.");
+            ComponentView bankComponentView = views.CreateComponentView(bankModule, "Bank Components", "Component diagram van de Bank module");
             bankComponentView.EnableAutomaticLayout();
             bankComponentView.Add(databaseAccount);
             bankComponentView.AddAllComponents();
             bankComponentView.Add(bank);
 
+            ComponentView importExportComponentView = views.CreateComponentView(importModule, "Import-Export Components", "Component diagram van de Import Export module.");
+            importExportComponentView.EnableAutomaticLayout();
+            importExportComponentView.Add(databaseAccount);
+            importExportComponentView.AddAllComponents();
 
             // Set Styling
             Styles styles = views.Configuration.Styles;
