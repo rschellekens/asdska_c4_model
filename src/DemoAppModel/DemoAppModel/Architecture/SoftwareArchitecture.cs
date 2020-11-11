@@ -1,14 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Linq;
 using DemoAppModel.Core;
 using Microsoft.Extensions.Logging;
 using Structurizr;
-using Structurizr.Api;
 using Structurizr.Core.Util;
-using Structurizr.Documentation;
 
 namespace DemoAppModel.Architecture
 {
@@ -49,7 +43,7 @@ namespace DemoAppModel.Architecture
         {
             // Add stakeholders en Systemen
             SoftwareSystem boekhoudSysteem = model.AddSoftwareSystem(Location.Internal, "Boekhoudsysteem", "Boekhoudsysteem voor midden en kleinbedrijf en ZZP'er");
-            
+
             SoftwareSystem itsmSysteem = model.AddSoftwareSystem(Location.Internal, "ITSM Systeem", "Interne CRM applicatie");
             itsmSysteem.AddTags(InternalSystemTag);
             boekhoudSysteem.Uses(itsmSysteem, "Haalt abonnement gegevens op");
@@ -85,8 +79,7 @@ namespace DemoAppModel.Architecture
             // Extra diagram: Systeemlandschap
             SystemLandscapeView systemLandscapeView = views.CreateSystemLandscapeView("SystemLandscape", "System Context diagram Boekhoudsysteem.");
             systemLandscapeView.AddAllElements();
-            //systemLandscapeView.EnableAutomaticLayout();
-
+            systemLandscapeView.EnableAutomaticLayout();
 
             // containers
             Container coreModule = boekhoudSysteem.AddContainer("Core Module", "Basis module voor inrichting, gebruikers", "C#");
@@ -96,7 +89,7 @@ namespace DemoAppModel.Architecture
             Container bankModule = boekhoudSysteem.AddContainer("Bank Module", "Importeren van betaalgegevens", "C#");
             bankModule.AddTags(Tags.Container);
             bankModule.Uses(bank, "krijgt gegevens van");
-            
+
             Container koppelingModule = boekhoudSysteem.AddContainer("Koppelingen Module", "Module voor inrichten diverse externe koppelingen", "C#");
             koppelingModule.AddTags(Tags.Container);
             koppelingModule.Uses(webshop, "krijgt gegevens van");
@@ -181,10 +174,10 @@ namespace DemoAppModel.Architecture
             // Add Views
             SystemContextView contextView = views.CreateSystemContextView(boekhoudSysteem, "SystemContext", "System Context diagram Boekhoudsysteem.");
             contextView.AddNearestNeighbours(boekhoudSysteem);
-            //contextView.EnableAutomaticLayout();
+            contextView.EnableAutomaticLayout();
 
             ContainerView containerView = views.CreateContainerView(boekhoudSysteem, "Containers", "Het container diagram voor het boekhoudsysteem.");
-            //containerView.EnableAutomaticLayout();
+            containerView.EnableAutomaticLayout();
             containerView.Add(hoofdgebruiker);
             containerView.Add(gebruiker);
             containerView.Add(accountant);
@@ -195,16 +188,15 @@ namespace DemoAppModel.Architecture
             containerView.Add(itsmSysteem);
 
             ComponentView bankComponentView = views.CreateComponentView(bankModule, "Bank Components", "Component diagram van de Bank module");
-            //bankComponentView.EnableAutomaticLayout();
+            bankComponentView.EnableAutomaticLayout();
             bankComponentView.Add(databaseAccount);
             bankComponentView.AddAllComponents();
             bankComponentView.Add(bank);
 
             ComponentView importExportComponentView = views.CreateComponentView(importModule, "Import-Export Components", "Component diagram van de Import Export module.");
-            //importExportComponentView.EnableAutomaticLayout();
+            importExportComponentView.EnableAutomaticLayout();
             importExportComponentView.Add(databaseAccount);
             importExportComponentView.AddAllComponents();
-
 
             // Extra diagram: Deployment
             const string Productie = "Productieomgeving";
@@ -247,7 +239,6 @@ namespace DemoAppModel.Architecture
             systeemDeploymentView.Add(productieOmgeving);
             systeemDeploymentView.Add(customerComputer);
             systeemDeploymentView.Add(dataReplicationRelationship);
-
 
             // Set Styling
             Styles styles = views.Configuration.Styles;

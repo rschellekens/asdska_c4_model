@@ -52,7 +52,7 @@ namespace DemoAppModel
             revealer.ShowSecrets();
 
             var c4 = serviceProvider.GetService<ISoftwareArchitecture>();
-            c4.SetWorkspace("DemoApp C4 Model", "C4 Architectuur View Model van DemoApp gebruikt tijdens HAN ASD-SKA (20-21)");
+            c4.SetWorkspace("DemoApp C4 Model (Structurizr for .NET)", "C4 Architectuur View Model van DemoApp gebruikt tijdens HAN ASD-SKA (20-21)");
             c4.PublishC4Model();
         }
     }
